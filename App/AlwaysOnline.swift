@@ -25,16 +25,6 @@ private let runningIndicatorColor = NSColor(
     }
 )
 
-private let segmentSelectionColor = NSColor(
-    name: NSColor.Name("AlwaysOnlineSegmentSelection"),
-    dynamicProvider: { appearance in
-        let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-        return isDark
-            ? NSColor(srgbRed: 0.31, green: 0.32, blue: 0.36, alpha: 1)
-            : NSColor(srgbRed: 0.99, green: 0.99, blue: 1.0, alpha: 1)
-    }
-)
-
 @MainActor final class Engine: ObservableObject {
     @Published var running = false
     @Published var mode = "无位移"
@@ -125,20 +115,36 @@ private enum PopoverTokens {
     static let groupSpacing: CGFloat = 12
     static let sectionSpacing: CGFloat = 16
     static let cardInset: CGFloat = 14
-    static let cardRadius: CGFloat = 14
-    static let controlRadius: CGFloat = 9
+    static let cardRadius: CGFloat = 16
+    static let controlRadius: CGFloat = 10
+    static let selectedRadius: CGFloat = 7
+    static let trackInset: CGFloat = 3
     static let statusIconSize: CGFloat = 26
     static let eventIconSize: CGFloat = 28
     static let segmentHeight: CGFloat = 30
     static let primaryActionHeight: CGFloat = 38
     static let menuHitWidth: CGFloat = 36
     static let menuHitHeight: CGFloat = 34
-    static let accent = Color(nsColor: .controlAccentColor)
-    static let separator = Color(nsColor: .separatorColor).opacity(0.62)
-    static let outline = Color.primary.opacity(0.085)
+    // One native popover material; interior surfaces only tint that material.
+    private static func adaptive(_ name: String, light: NSColor, dark: NSColor) -> Color {
+        Color(nsColor: NSColor(name: NSColor.Name(name)) { appearance in
+            appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? dark : light
+        })
+    }
+    static let accent = adaptive("BrandBlue", light: .init(srgbRed: 0.0, green: 0.45, blue: 0.96, alpha: 1),
+                                dark: .init(srgbRed: 0.23, green: 0.57, blue: 0.98, alpha: 1))
+    static let actionFill = adaptive("ActionBlue", light: .init(srgbRed: 0.0, green: 0.38, blue: 0.83, alpha: 1),
+                                    dark: .init(srgbRed: 0.12, green: 0.42, blue: 0.84, alpha: 1))
+    static let separator = Color(nsColor: .separatorColor).opacity(0.48)
+    static let outline = adaptive("SurfaceEdge", light: .black.withAlphaComponent(0.055), dark: .white.withAlphaComponent(0.075))
     static let subtleSurface = Color.primary.opacity(0.045)
-    static let controlTrack = Color.primary.opacity(0.075)
-    static let selectedControlSurface = Color(nsColor: segmentSelectionColor)
+    static let cardSurface = adaptive("SettingsSurface", light: .white.withAlphaComponent(0.17), dark: .white.withAlphaComponent(0.035))
+    static let edgeHighlight = adaptive("EdgeHighlight", light: .white.withAlphaComponent(0.66), dark: .white.withAlphaComponent(0.12))
+    static let controlTrack = adaptive("SegmentTrack", light: .init(white: 0.30, alpha: 0.085), dark: .init(white: 0.08, alpha: 0.24))
+    static let selectedControlSurface = adaptive("SelectedSegment", light: .init(white: 0.985, alpha: 0.94), dark: .init(srgbRed: 0.32, green: 0.33, blue: 0.35, alpha: 0.96))
+    static let cardShadow = adaptive("CardShadow", light: .black.withAlphaComponent(0.025), dark: .black.withAlphaComponent(0.015))
+    static let selectedShadow = adaptive("SelectionShadow", light: .black.withAlphaComponent(0.13), dark: .black.withAlphaComponent(0.065))
+    static let actionShadow = adaptive("ActionShadow", light: .black.withAlphaComponent(0.10), dark: .black.withAlphaComponent(0.05))
     static let title = Font.system(size: 15, weight: .semibold, design: .default)
     static let sectionTitle = Font.system(size: 12, weight: .semibold, design: .default)
     static let body = Font.system(size: 12, weight: .medium, design: .default)
@@ -157,8 +163,8 @@ struct ContentView: View {
             header
 
             VStack(spacing: 0) {
-                statusRow(icon: "message", title: "企业微信", value: engine.wecom == "已检测到" ? "已检测" : engine.wecom)
-                Divider().padding(.leading, 39)
+                statusRow(icon: "message", title: "企业微信", value: engine.wecom, needsAttention: engine.wecom != "已检测到")
+                Rectangle().fill(PopoverTokens.separator).frame(height: 0.5).padding(.leading, 39)
                 statusRow(
                     icon: "hand.raised",
                     title: "辅助功能",
@@ -176,8 +182,9 @@ struct ContentView: View {
             recentEvent
                 .padding(.top, PopoverTokens.groupSpacing)
 
-            Divider()
-                .overlay(PopoverTokens.separator)
+            Rectangle()
+                .fill(PopoverTokens.separator)
+                .frame(height: 0.5)
                 .padding(.top, PopoverTokens.sectionSpacing)
                 .padding(.bottom, PopoverTokens.groupSpacing)
 
@@ -225,7 +232,7 @@ struct ContentView: View {
             Spacer(minLength: 4)
 
             HStack(spacing: PopoverTokens.compactSpacing) {
-                Image(systemName: engine.running ? "checkmark.circle.fill" : "pause.circle")
+                Image(systemName: engine.running ? "play.circle" : "pause.circle")
                     .font(.system(size: 11, weight: .medium))
                 Text(engine.running ? "运行中" : "已停止")
                     .font(PopoverTokens.statusLabel.weight(.semibold))
@@ -234,8 +241,8 @@ struct ContentView: View {
             .foregroundStyle(.secondary)
             .padding(.horizontal, PopoverTokens.tightSpacing)
             .padding(.vertical, 6)
-            .background(.thinMaterial, in: Capsule())
-            .overlay(Capsule().strokeBorder(PopoverTokens.outline, lineWidth: 0.7))
+            .background(PopoverTokens.cardSurface, in: Capsule())
+            .overlay(Capsule().strokeBorder(PopoverTokens.edgeHighlight.opacity(0.5), lineWidth: 0.5))
             .accessibilityElement(children: .combine)
         }
         .frame(height: 44)
@@ -266,10 +273,17 @@ struct ContentView: View {
             }
         }
         .padding(PopoverTokens.cardInset)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: PopoverTokens.cardRadius, style: .continuous))
+        .background {
+            RoundedRectangle(cornerRadius: PopoverTokens.cardRadius, style: .continuous)
+                .fill(PopoverTokens.cardSurface)
+                .shadow(color: PopoverTokens.cardShadow, radius: 8, y: 3)
+        }
         .overlay {
             RoundedRectangle(cornerRadius: PopoverTokens.cardRadius, style: .continuous)
-                .strokeBorder(PopoverTokens.outline, lineWidth: 0.8)
+                .strokeBorder(
+                    LinearGradient(colors: [PopoverTokens.edgeHighlight, PopoverTokens.edgeHighlight.opacity(0.35)], startPoint: .top, endPoint: .bottom),
+                    lineWidth: 0.75
+                )
         }
     }
 
@@ -285,9 +299,9 @@ struct ContentView: View {
                 Text("最近事件")
                     .font(PopoverTokens.sectionTitle)
                     .foregroundStyle(.primary)
-                Text(engine.last == "尚未发送" ? "尚未发送" : engine.last)
+                Text(engine.last)
                     .font(PopoverTokens.caption)
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(.secondary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -305,7 +319,7 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: PopoverTokens.primaryActionHeight)
             }
-            .buttonStyle(PremiumActionButtonStyle(prominent: !engine.running, isHovered: interaction.actionHovered))
+            .buttonStyle(PremiumActionButtonStyle(isHovered: interaction.actionHovered))
             .onHover { interaction.actionHovered = $0 }
             .help(engine.running ? "停止运行" : "开始运行")
 
@@ -320,13 +334,9 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
                     .frame(width: PopoverTokens.menuHitWidth, height: PopoverTokens.menuHitHeight)
                     .background(
-                        PopoverTokens.subtleSurface.opacity(interaction.menuHovered ? 1.45 : 1),
+                        PopoverTokens.subtleSurface.opacity(interaction.menuHovered ? 1.45 : 0),
                         in: RoundedRectangle(cornerRadius: 9, style: .continuous)
                     )
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .strokeBorder(PopoverTokens.outline, lineWidth: 0.7)
-                    }
                     .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
             }
             .menuStyle(.borderlessButton)
@@ -355,7 +365,7 @@ struct ContentView: View {
 
             PremiumSegmentedControl(values: values, selection: selection)
                 .disabled(disabled)
-                .opacity(disabled ? 0.68 : 1)
+                .accessibilityLabel(title)
         }
     }
 
@@ -405,6 +415,7 @@ private struct PremiumSegmentedControl: View {
     let values: [String]
     @Binding var selection: String
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.isEnabled) private var isEnabled
     @Namespace private var selectionNamespace
     @StateObject private var interaction = SegmentInteractionState()
 
@@ -414,14 +425,24 @@ private struct PremiumSegmentedControl: View {
                 segmentButton(value)
             }
         }
-        .padding(3)
+        .padding(PopoverTokens.trackInset)
         .background(PopoverTokens.controlTrack, in: RoundedRectangle(cornerRadius: PopoverTokens.controlRadius, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: PopoverTokens.controlRadius, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.045), lineWidth: 0.65)
+                .strokeBorder(PopoverTokens.outline.opacity(0.45), lineWidth: 0.5)
         }
         .animation(reduceMotion ? nil : .easeOut(duration: 0.11), value: interaction.hoveredValue)
         .accessibilityElement(children: .contain)
+        .onMoveCommand { direction in
+            guard isEnabled, let index = values.firstIndex(of: selection) else { return }
+            let next: Int
+            switch direction {
+            case .left: next = max(0, index - 1)
+            case .right: next = min(values.count - 1, index + 1)
+            default: return
+            }
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.17)) { selection = values[next] }
+        }
     }
 
     private func segmentButton(_ value: String) -> some View {
@@ -435,27 +456,30 @@ private struct PremiumSegmentedControl: View {
         } label: {
             Text(value)
                 .font(.system(size: 12, weight: isSelected ? .semibold : .medium, design: .default))
-                .foregroundStyle(isSelected ? Color.primary : Color.secondary)
+                .foregroundStyle(isSelected ? Color(nsColor: .labelColor) : Color(nsColor: .secondaryLabelColor))
                 .frame(maxWidth: .infinity)
                 .frame(height: PopoverTokens.segmentHeight)
                 .background {
                     if isSelected {
-                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        RoundedRectangle(cornerRadius: PopoverTokens.selectedRadius, style: .continuous)
                             .fill(PopoverTokens.selectedControlSurface)
                             .overlay {
-                                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                    .strokeBorder(PopoverTokens.outline, lineWidth: 0.75)
+                                RoundedRectangle(cornerRadius: PopoverTokens.selectedRadius, style: .continuous)
+                                    .strokeBorder(
+                                        LinearGradient(colors: [PopoverTokens.edgeHighlight, PopoverTokens.outline], startPoint: .top, endPoint: .bottom),
+                                        lineWidth: 0.65
+                                    )
                             }
-                            .shadow(color: Color.black.opacity(0.085), radius: 1.5, y: 1)
+                            .shadow(color: PopoverTokens.selectedShadow, radius: 2.5, y: 1.5)
                             .matchedGeometryEffect(id: "selected-segment", in: selectionNamespace)
-                    } else if interaction.hoveredValue == value {
-                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    } else if isEnabled && interaction.hoveredValue == value {
+                        RoundedRectangle(cornerRadius: PopoverTokens.selectedRadius, style: .continuous)
                             .fill(Color.primary.opacity(0.045))
                     }
                 }
-                .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: PopoverTokens.selectedRadius, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SegmentButtonStyle())
         .onHover { hovering in
             interaction.hoveredValue = hovering ? value : (interaction.hoveredValue == value ? nil : interaction.hoveredValue)
         }
@@ -465,26 +489,40 @@ private struct PremiumSegmentedControl: View {
     }
 }
 
+// Preserve Button semantics and use the native disabled appearance without extra fading.
+private struct SegmentButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .overlay {
+                RoundedRectangle(cornerRadius: PopoverTokens.selectedRadius, style: .continuous)
+                    .fill(Color.primary.opacity(configuration.isPressed ? 0.04 : 0))
+                    .allowsHitTesting(false)
+            }
+    }
+}
+
 private struct PremiumActionButtonStyle: ButtonStyle {
-    let prominent: Bool
     let isHovered: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
         let pressed = configuration.isPressed
-        let fill = prominent
-            ? PopoverTokens.accent.opacity(pressed ? 0.86 : (isHovered ? 1 : 0.94))
-            : Color(nsColor: .controlBackgroundColor)
-
+        let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
         return configuration.label
-            .font(.system(size: 12, weight: .semibold, design: .default))
-            .foregroundStyle(prominent ? Color(nsColor: .alternateSelectedControlTextColor) : Color.primary)
-            .background(fill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(.white)
+            .background(PopoverTokens.actionFill, in: shape)
+            .overlay(shape.fill(.white.opacity(isHovered && isEnabled ? 0.025 : 0)))
+            .overlay(shape.fill(.black.opacity(pressed ? 0.10 : 0)))
             .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(prominent ? Color.white.opacity(0.18) : PopoverTokens.outline, lineWidth: 0.75)
+                shape.strokeBorder(
+                    LinearGradient(colors: [.white.opacity(0.40), .white.opacity(0.12)], startPoint: .top, endPoint: .bottom),
+                    lineWidth: 0.75
+                )
             }
-            .shadow(color: Color.black.opacity(prominent ? 0.12 : 0.045), radius: pressed ? 1 : 2.5, y: pressed ? 0 : 1)
+            .shadow(color: PopoverTokens.actionShadow, radius: pressed ? 1 : 4, y: pressed ? 0 : 2)
+            .opacity(isEnabled ? 1 : 0.5)
             .scaleEffect(pressed && !reduceMotion ? 0.988 : 1)
             .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: pressed)
             .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isHovered)
