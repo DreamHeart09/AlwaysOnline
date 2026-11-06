@@ -31,7 +31,7 @@ private let runningIndicatorColor = NSColor(
     @Published var interval = 300.0
     @Published var status = "已停止"
     @Published var trusted = AXIsProcessTrusted()
-    @Published var last = "尚未发送"
+    @Published var last = "暂无记录"
     @Published var wecom = "未检测"
     private var timer: Timer?
     private var panelRefreshTimer: Timer?
@@ -53,7 +53,7 @@ private let runningIndicatorColor = NSColor(
             let name = (app.localizedName ?? "").lowercased(), id = (app.bundleIdentifier ?? "").lowercased()
             return name.contains("企业微信") || name.contains("wecom") || id.contains("wxwork") || id.contains("wework")
         }
-        wecom = matches.isEmpty ? "未检测到（可能漏报）" : "已检测到"
+        wecom = matches.isEmpty ? "未检测到（可能漏报）" : "已识别"
     }
     func beginPanelRefresh() {
         refresh()
@@ -102,7 +102,10 @@ private let runningIndicatorColor = NSColor(
             guard rect.contains(target), let a = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: target, mouseButton: .left), let b = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: pos, mouseButton: .left) else { last = "鼠标事件创建失败"; return }
             a.post(tap: .cghidEventTap); b.post(tap: .cghidEventTap)
         }
-        last = "\(Date().formatted(date: .omitted, time: .standard)) 已调用事件投递"
+        last = Date().formatted(
+            .dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)
+                .locale(Locale(identifier: "en_GB"))
+        )
     }
 }
 
@@ -163,7 +166,7 @@ struct ContentView: View {
             header
 
             VStack(spacing: 0) {
-                statusRow(icon: "message", title: "企业微信", value: engine.wecom, needsAttention: engine.wecom != "已检测到")
+                statusRow(icon: "message", title: "企业微信", value: engine.wecom, needsAttention: engine.wecom != "已识别")
                 Rectangle().fill(PopoverTokens.separator).frame(height: 0.5).padding(.leading, 39)
                 statusRow(
                     icon: "hand.raised",
@@ -222,7 +225,7 @@ struct ContentView: View {
                     .tracking(-0.22)
                     .foregroundStyle(.primary)
                     .lineLimit(1)
-                Text(engine.running ? "每 \(intervalLabel) 尝试维持活动状态" : stoppedDetail)
+                Text(engine.running ? "每 \(intervalLabel)，保持活跃" : stoppedDetail)
                     .font(PopoverTokens.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -261,12 +264,12 @@ struct ContentView: View {
             }
 
             VStack(spacing: 10) {
-                settingRow(title: "活动模式", values: ["无位移", "鼠标微移"], selection: Binding(
+                settingRow(title: "活动方式", values: ["无位移", "鼠标微移"], selection: Binding(
                     get: { engine.mode == "无位移" ? "无位移" : "鼠标微移" },
                     set: { engine.mode = $0 }
                 ), disabled: engine.running)
 
-                settingRow(title: "发送间隔", values: ["1 分钟", "5 分钟", "10 分钟"], selection: Binding(
+                settingRow(title: "活动间隔", values: ["1 分钟", "5 分钟", "10 分钟"], selection: Binding(
                     get: { engine.interval == 60 ? "1 分钟" : (engine.interval == 300 ? "5 分钟" : "10 分钟") },
                     set: { engine.interval = $0 == "1 分钟" ? 60 : ($0 == "5 分钟" ? 300 : 600) }
                 ), disabled: engine.running)
@@ -296,7 +299,7 @@ struct ContentView: View {
             .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text("最近事件")
+                Text("上次尝试")
                     .font(PopoverTokens.sectionTitle)
                     .foregroundStyle(.primary)
                 Text(engine.last)
@@ -352,7 +355,7 @@ struct ContentView: View {
 
     private var stoppedDetail: String {
         if !engine.trusted { return "需要辅助功能权限" }
-        if engine.status == "已停止" { return "按需开始运行" }
+        if engine.status == "已停止" { return "准备就绪" }
         return engine.status
     }
 
