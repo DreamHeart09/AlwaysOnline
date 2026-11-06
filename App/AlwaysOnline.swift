@@ -129,7 +129,7 @@ private enum PopoverTokens {
     static let controlRadius: CGFloat = 9
     static let statusIconSize: CGFloat = 26
     static let eventIconSize: CGFloat = 28
-    static let segmentHeight: CGFloat = 29
+    static let segmentHeight: CGFloat = 30
     static let primaryActionHeight: CGFloat = 38
     static let menuHitWidth: CGFloat = 36
     static let menuHitHeight: CGFloat = 34
@@ -275,20 +275,16 @@ struct ContentView: View {
 
     private var recentEvent: some View {
         HStack(alignment: .center, spacing: PopoverTokens.inlineSpacing) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(PopoverTokens.subtleSurface)
-                Image(systemName: "clock.arrow.circlepath")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
-            }
+            Image(systemName: "clock.arrow.circlepath")
+                .font(.system(size: 14, weight: .regular))
+                .foregroundStyle(.secondary)
             .frame(width: PopoverTokens.eventIconSize, height: PopoverTokens.eventIconSize)
             .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text("最近事件")
-                    .font(PopoverTokens.microLabel)
-                    .foregroundStyle(.secondary)
+                    .font(PopoverTokens.sectionTitle)
+                    .foregroundStyle(.primary)
                 Text(engine.last == "尚未发送" ? "尚未发送" : engine.last)
                     .font(PopoverTokens.caption)
                     .foregroundStyle(.primary)
@@ -353,8 +349,8 @@ struct ContentView: View {
     private func settingRow(title: String, values: [String], selection: Binding<String>, disabled: Bool) -> some View {
         HStack(spacing: PopoverTokens.inlineSpacing) {
             Text(title)
-                .font(.system(size: 11, weight: .medium, design: .default))
-                .foregroundStyle(.secondary)
+                .font(PopoverTokens.body)
+                .foregroundStyle(.primary)
                 .frame(width: 58, alignment: .leading)
 
             PremiumSegmentedControl(values: values, selection: selection)
@@ -372,13 +368,9 @@ struct ContentView: View {
         action: (() -> Void)? = nil
     ) -> some View {
         HStack(spacing: 10) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(PopoverTokens.subtleSurface)
-                Image(systemName: icon)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
-            }
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .regular))
+                .foregroundStyle(.secondary)
             .frame(width: PopoverTokens.statusIconSize, height: PopoverTokens.statusIconSize)
             .accessibilityHidden(true)
 
@@ -442,7 +434,7 @@ private struct PremiumSegmentedControl: View {
             }
         } label: {
             Text(value)
-                .font(.system(size: 11, weight: isSelected ? .semibold : .medium, design: .default))
+                .font(.system(size: 12, weight: isSelected ? .semibold : .medium, design: .default))
                 .foregroundStyle(isSelected ? Color.primary : Color.secondary)
                 .frame(maxWidth: .infinity)
                 .frame(height: PopoverTokens.segmentHeight)
@@ -700,6 +692,8 @@ private struct QuickMenuRow: View {
     let title: String
     let symbol: String
     let action: () -> Void
+    @StateObject private var interaction = QuickMenuRowInteraction()
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 10) {
@@ -718,9 +712,18 @@ private struct QuickMenuRow: View {
             .padding(.horizontal, 9)
             .frame(height: 31)
             .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .background(
+                interaction.isHovered ? Color.primary.opacity(0.09) : .clear,
+                in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+            )
         }
-        .buttonStyle(.borderless)
+        .buttonStyle(.plain)
+        .onHover { interaction.isHovered = $0 }
     }
+}
+
+@MainActor private final class QuickMenuRowInteraction: ObservableObject {
+    @Published var isHovered = false
 }
 
 @MainActor private final class StatusDotView: NSView {
