@@ -15,6 +15,26 @@ private let menuBarBrandImage: NSImage? = {
     return templateImage(image)
 }()
 
+private let runningIndicatorColor = NSColor(
+    name: NSColor.Name("AlwaysOnlineRunningIndicator"),
+    dynamicProvider: { appearance in
+        let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        return isDark
+            ? NSColor(srgbRed: 0.35, green: 0.76, blue: 0.50, alpha: 1)
+            : NSColor(srgbRed: 0.16, green: 0.52, blue: 0.32, alpha: 1)
+    }
+)
+
+private let segmentSelectionColor = NSColor(
+    name: NSColor.Name("AlwaysOnlineSegmentSelection"),
+    dynamicProvider: { appearance in
+        let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        return isDark
+            ? NSColor(srgbRed: 0.31, green: 0.32, blue: 0.36, alpha: 1)
+            : NSColor(srgbRed: 0.99, green: 0.99, blue: 1.0, alpha: 1)
+    }
+)
+
 @MainActor final class Engine: ObservableObject {
     @Published var running = false
     @Published var mode = "无位移"
@@ -92,56 +112,53 @@ private let menuBarBrandImage: NSImage? = {
             guard rect.contains(target), let a = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: target, mouseButton: .left), let b = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: pos, mouseButton: .left) else { last = "鼠标事件创建失败"; return }
             a.post(tap: .cghidEventTap); b.post(tap: .cghidEventTap)
         }
-        last = "\(Date().formatted(date: .omitted, time: .standard)) 已调用事件投递（不代表在线）"
+        last = "\(Date().formatted(date: .omitted, time: .standard)) 已调用事件投递"
     }
+}
+
+private enum PopoverTokens {
+    static let width: CGFloat = 340
+    static let outerInset: CGFloat = 17
+    static let compactSpacing: CGFloat = 5
+    static let tightSpacing: CGFloat = 8
+    static let inlineSpacing: CGFloat = 10
+    static let groupSpacing: CGFloat = 12
+    static let sectionSpacing: CGFloat = 16
+    static let cardInset: CGFloat = 14
+    static let cardRadius: CGFloat = 14
+    static let controlRadius: CGFloat = 9
+    static let statusIconSize: CGFloat = 26
+    static let eventIconSize: CGFloat = 28
+    static let segmentHeight: CGFloat = 29
+    static let primaryActionHeight: CGFloat = 38
+    static let menuHitWidth: CGFloat = 36
+    static let menuHitHeight: CGFloat = 34
+    static let accent = Color(nsColor: .controlAccentColor)
+    static let separator = Color(nsColor: .separatorColor).opacity(0.62)
+    static let outline = Color.primary.opacity(0.085)
+    static let subtleSurface = Color.primary.opacity(0.045)
+    static let controlTrack = Color.primary.opacity(0.075)
+    static let selectedControlSurface = Color(nsColor: segmentSelectionColor)
+    static let title = Font.system(size: 15, weight: .semibold, design: .default)
+    static let sectionTitle = Font.system(size: 12, weight: .semibold, design: .default)
+    static let body = Font.system(size: 12, weight: .medium, design: .default)
+    static let caption = Font.system(size: 11, weight: .regular, design: .default)
+    static let statusLabel = Font.system(size: 11, weight: .medium, design: .default)
+    static let microLabel = Font.system(size: 10, weight: .semibold, design: .default)
 }
 
 struct ContentView: View {
     @ObservedObject var engine: Engine
-    private let accent = Color.accentColor
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @StateObject private var interaction = PopoverInteractionState()
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top, spacing: 11) {
-                if let image = menuBarBrandImage {
-                    Image(nsImage: image)
-                        .renderingMode(.template)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 22, height: 22)
-                        .foregroundStyle(.primary)
-                        .padding(.top, 1)
-                        .accessibilityHidden(true)
-                } else {
-                    Image(systemName: "infinity")
-                        .font(.system(size: 21, weight: .medium))
-                        .foregroundStyle(.primary)
-                        .frame(width: 22, height: 22)
-                        .accessibilityHidden(true)
-                }
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("Always Online")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.primary)
-                    HStack(spacing: 5) {
-                        Image(systemName: engine.running ? "checkmark.circle.fill" : "pause.circle")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.secondary)
-                        Text(engine.running ? "运行中" : "已停止")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.primary)
-                    }
-                    Text(engine.running ? "每 \(intervalLabel) 尝试维持活动状态" : stoppedDetail)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                }
-                Spacer(minLength: 0)
-            }
+            header
 
             VStack(spacing: 0) {
-                statusRow(icon: "message", title: "企业微信", value: engine.wecom == "已检测到" ? "已检测到" : engine.wecom)
-                Divider().padding(.leading, 28)
+                statusRow(icon: "message", title: "企业微信", value: engine.wecom == "已检测到" ? "已检测" : engine.wecom)
+                Divider().padding(.leading, 39)
                 statusRow(
                     icon: "hand.raised",
                     title: "辅助功能",
@@ -151,51 +168,176 @@ struct ContentView: View {
                     action: engine.trusted ? nil : { engine.requestPermission() }
                 )
             }
-            .padding(.horizontal, 2)
-            .padding(.top, 16)
+            .padding(.top, PopoverTokens.sectionSpacing)
 
-            VStack(alignment: .leading, spacing: 13) {
-                Text("运行设置")
-                    .font(.system(size: 12, weight: .semibold))
+            settingsCard
+                .padding(.top, PopoverTokens.sectionSpacing)
+
+            recentEvent
+                .padding(.top, PopoverTokens.groupSpacing)
+
+            Divider()
+                .overlay(PopoverTokens.separator)
+                .padding(.top, PopoverTokens.sectionSpacing)
+                .padding(.bottom, PopoverTokens.groupSpacing)
+
+            actionArea
+        }
+        .padding(.horizontal, PopoverTokens.outerInset)
+        .padding(.vertical, 16)
+        .frame(width: PopoverTokens.width)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: engine.trusted)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: engine.running)
+        .onAppear { engine.refresh() }
+    }
+
+    private var header: some View {
+        HStack(spacing: PopoverTokens.groupSpacing) {
+            if let image = menuBarBrandImage {
+                Image(nsImage: image)
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 32, height: 32)
+                    .foregroundStyle(PopoverTokens.accent)
+                    .accessibilityHidden(true)
+            } else {
+                Image(systemName: "infinity")
+                    .font(.system(size: 31, weight: .medium))
+                    .foregroundStyle(PopoverTokens.accent)
+                    .frame(width: 32, height: 32)
+                    .accessibilityHidden(true)
+            }
+
+            VStack(alignment: .leading, spacing: PopoverTokens.compactSpacing - 1) {
+                Text("Always Online")
+                    .font(PopoverTokens.title)
+                    .tracking(-0.22)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                Text(engine.running ? "每 \(intervalLabel) 尝试维持活动状态" : stoppedDetail)
+                    .font(PopoverTokens.caption)
                     .foregroundStyle(.secondary)
-                segmentControl(title: "活动模式", values: ["无位移", "鼠标微移"], selection: Binding(
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+
+            Spacer(minLength: 4)
+
+            HStack(spacing: PopoverTokens.compactSpacing) {
+                Image(systemName: engine.running ? "checkmark.circle.fill" : "pause.circle")
+                    .font(.system(size: 11, weight: .medium))
+                Text(engine.running ? "运行中" : "已停止")
+                    .font(PopoverTokens.statusLabel.weight(.semibold))
+                    .fixedSize()
+            }
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, PopoverTokens.tightSpacing)
+            .padding(.vertical, 6)
+            .background(.thinMaterial, in: Capsule())
+            .overlay(Capsule().strokeBorder(PopoverTokens.outline, lineWidth: 0.7))
+            .accessibilityElement(children: .combine)
+        }
+        .frame(height: 44)
+    }
+
+    private var settingsCard: some View {
+        VStack(alignment: .leading, spacing: PopoverTokens.groupSpacing) {
+            HStack(spacing: PopoverTokens.tightSpacing) {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(PopoverTokens.accent)
+                    .frame(width: 18, height: 18)
+                Text("运行设置")
+                    .font(PopoverTokens.sectionTitle)
+                    .foregroundStyle(.primary)
+            }
+
+            VStack(spacing: 10) {
+                settingRow(title: "活动模式", values: ["无位移", "鼠标微移"], selection: Binding(
                     get: { engine.mode == "无位移" ? "无位移" : "鼠标微移" },
                     set: { engine.mode = $0 }
                 ), disabled: engine.running)
-                segmentControl(title: "发送间隔", values: ["1 分钟", "5 分钟", "10 分钟"], selection: Binding(
+
+                settingRow(title: "发送间隔", values: ["1 分钟", "5 分钟", "10 分钟"], selection: Binding(
                     get: { engine.interval == 60 ? "1 分钟" : (engine.interval == 300 ? "5 分钟" : "10 分钟") },
                     set: { engine.interval = $0 == "1 分钟" ? 60 : ($0 == "5 分钟" ? 300 : 600) }
                 ), disabled: engine.running)
             }
-            .padding(13)
-            .background(Color(nsColor: .controlBackgroundColor).opacity(0.55), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous).strokeBorder(Color.primary.opacity(0.07), lineWidth: 1))
-            .padding(.top, 14)
-
-            Divider()
-                .padding(.top, 14)
-                .padding(.bottom, 11)
-            HStack {
-                Button { engine.running ? engine.stop() : engine.start() } label: {
-                    Label(engine.running ? "停止" : "开始运行", systemImage: engine.running ? "stop.fill" : "play.fill")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .tint(accent)
-                Menu {
-                    Button("退出 Always Online", systemImage: "power") { engine.stop(); NSApplication.shared.terminate(nil) }
-                } label: { Image(systemName: "ellipsis") }
-                    .menuStyle(.borderlessButton)
-                    .fixedSize()
-                    .help("更多操作")
-            }
         }
-        .padding(17)
-        .frame(width: 340)
-        .animation(.easeOut(duration: 0.2), value: engine.trusted)
-        .animation(.spring(response: 0.34, dampingFraction: 0.82), value: engine.running)
-        .onAppear { engine.refresh() }
+        .padding(PopoverTokens.cardInset)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: PopoverTokens.cardRadius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: PopoverTokens.cardRadius, style: .continuous)
+                .strokeBorder(PopoverTokens.outline, lineWidth: 0.8)
+        }
+    }
+
+    private var recentEvent: some View {
+        HStack(alignment: .center, spacing: PopoverTokens.inlineSpacing) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(PopoverTokens.subtleSurface)
+                Image(systemName: "clock.arrow.circlepath")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(width: PopoverTokens.eventIconSize, height: PopoverTokens.eventIconSize)
+            .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("最近事件")
+                    .font(PopoverTokens.microLabel)
+                    .foregroundStyle(.secondary)
+                Text(engine.last == "尚未发送" ? "尚未发送" : engine.last)
+                    .font(PopoverTokens.caption)
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 2)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var actionArea: some View {
+        HStack(spacing: PopoverTokens.tightSpacing + 1) {
+            Button { engine.running ? engine.stop() : engine.start() } label: {
+                Label(engine.running ? "停止" : "开始运行", systemImage: engine.running ? "stop.fill" : "play.fill")
+                    .labelStyle(.titleAndIcon)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: PopoverTokens.primaryActionHeight)
+            }
+            .buttonStyle(PremiumActionButtonStyle(prominent: !engine.running, isHovered: interaction.actionHovered))
+            .onHover { interaction.actionHovered = $0 }
+            .help(engine.running ? "停止运行" : "开始运行")
+
+            Menu {
+                Button("退出 Always Online", systemImage: "power") {
+                    engine.stop()
+                    NSApplication.shared.terminate(nil)
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: PopoverTokens.menuHitWidth, height: PopoverTokens.menuHitHeight)
+                    .background(
+                        PopoverTokens.subtleSurface.opacity(interaction.menuHovered ? 1.45 : 1),
+                        in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .strokeBorder(PopoverTokens.outline, lineWidth: 0.7)
+                    }
+                    .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+            }
+            .menuStyle(.borderlessButton)
+            .onHover { interaction.menuHovered = $0 }
+            .help("更多操作")
+            .accessibilityLabel("更多操作")
+        }
     }
 
     private var intervalLabel: String {
@@ -208,6 +350,19 @@ struct ContentView: View {
         return engine.status
     }
 
+    private func settingRow(title: String, values: [String], selection: Binding<String>, disabled: Bool) -> some View {
+        HStack(spacing: PopoverTokens.inlineSpacing) {
+            Text(title)
+                .font(.system(size: 11, weight: .medium, design: .default))
+                .foregroundStyle(.secondary)
+                .frame(width: 58, alignment: .leading)
+
+            PremiumSegmentedControl(values: values, selection: selection)
+                .disabled(disabled)
+                .opacity(disabled ? 0.68 : 1)
+        }
+    }
+
     private func statusRow(
         icon: String,
         title: String,
@@ -217,66 +372,147 @@ struct ContentView: View {
         action: (() -> Void)? = nil
     ) -> some View {
         HStack(spacing: 10) {
-            Image(systemName: icon).font(.system(size: 12)).foregroundStyle(.secondary).frame(width: 15)
-            Text(title).font(.system(size: 12)).foregroundStyle(.primary)
-            Spacer()
-            if let actionTitle, let action {
-                Button(actionTitle, systemImage: "arrow.up.right.square", action: action)
+            ZStack {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(PopoverTokens.subtleSurface)
+                Image(systemName: icon)
                     .font(.system(size: 11, weight: .medium))
-                    .buttonStyle(.link)
-            } else if !needsAttention && (value == "已检测到" || value == "已授权") {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.secondary)
             }
-            if !value.isEmpty {
-                Text(value).font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(needsAttention ? Color.orange : Color.secondary)
-                    .lineLimit(1)
+            .frame(width: PopoverTokens.statusIconSize, height: PopoverTokens.statusIconSize)
+            .accessibilityHidden(true)
+
+            Text(title)
+                .font(PopoverTokens.body)
+                .foregroundStyle(.primary)
+            Spacer()
+
+            if let actionTitle, let action {
+                Button(actionTitle, systemImage: "arrow.up.right.square", action: action)
+                    .font(PopoverTokens.statusLabel)
+                    .buttonStyle(.link)
+            } else {
+                HStack(spacing: 5) {
+                    if !needsAttention {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 9, weight: .semibold))
+                    }
+                    Text(value)
+                        .font(PopoverTokens.statusLabel)
+                }
+                .foregroundStyle(needsAttention ? Color.orange : Color.secondary)
+                .lineLimit(1)
             }
         }
-        .padding(.vertical, 8)
+        .padding(.horizontal, 3)
+        .padding(.vertical, 6)
+    }
+}
+
+private struct PremiumSegmentedControl: View {
+    let values: [String]
+    @Binding var selection: String
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Namespace private var selectionNamespace
+    @StateObject private var interaction = SegmentInteractionState()
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(values, id: \.self) { value in
+                segmentButton(value)
+            }
+        }
+        .padding(3)
+        .background(PopoverTokens.controlTrack, in: RoundedRectangle(cornerRadius: PopoverTokens.controlRadius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: PopoverTokens.controlRadius, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.045), lineWidth: 0.65)
+        }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.11), value: interaction.hoveredValue)
+        .accessibilityElement(children: .contain)
     }
 
-    private func segmentControl(title: String, values: [String], selection: Binding<String>, disabled: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
-            HStack {
-                Text(title).font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
-                Spacer()
-                Text(selection.wrappedValue).font(.system(size: 11, weight: .medium)).foregroundStyle(.primary)
+    private func segmentButton(_ value: String) -> some View {
+        let isSelected = selection == value
+
+        return Button {
+            guard !isSelected else { return }
+            withAnimation(reduceMotion ? nil : .snappy(duration: 0.17)) {
+                selection = value
             }
-            HStack(spacing: 3) {
-                ForEach(values, id: \.self) { value in
-                    Button { selection.wrappedValue = value } label: {
-                        Text(value)
-                            .font(.system(size: 11, weight: selection.wrappedValue == value ? .semibold : .regular))
-                            .foregroundStyle(selection.wrappedValue == value ? Color.primary : Color.secondary)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 7)
-                            .background {
-                                if selection.wrappedValue == value {
-                                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                        .fill(Color(nsColor: .controlBackgroundColor))
-                                        .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
-                                }
+        } label: {
+            Text(value)
+                .font(.system(size: 11, weight: isSelected ? .semibold : .medium, design: .default))
+                .foregroundStyle(isSelected ? Color.primary : Color.secondary)
+                .frame(maxWidth: .infinity)
+                .frame(height: PopoverTokens.segmentHeight)
+                .background {
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .fill(PopoverTokens.selectedControlSurface)
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                    .strokeBorder(PopoverTokens.outline, lineWidth: 0.75)
                             }
-                            .contentShape(Rectangle())
+                            .shadow(color: Color.black.opacity(0.085), radius: 1.5, y: 1)
+                            .matchedGeometryEffect(id: "selected-segment", in: selectionNamespace)
+                    } else if interaction.hoveredValue == value {
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .fill(Color.primary.opacity(0.045))
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(selection.wrappedValue == value ? .isSelected : [])
-                    .disabled(disabled)
                 }
-            }
-            .padding(3)
-            .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            interaction.hoveredValue = hovering ? value : (interaction.hoveredValue == value ? nil : interaction.hoveredValue)
+        }
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityLabel(value)
+        .accessibilityHint(isSelected ? "当前选择" : "选择此选项")
     }
+}
+
+private struct PremiumActionButtonStyle: ButtonStyle {
+    let prominent: Bool
+    let isHovered: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func makeBody(configuration: Configuration) -> some View {
+        let pressed = configuration.isPressed
+        let fill = prominent
+            ? PopoverTokens.accent.opacity(pressed ? 0.86 : (isHovered ? 1 : 0.94))
+            : Color(nsColor: .controlBackgroundColor)
+
+        return configuration.label
+            .font(.system(size: 12, weight: .semibold, design: .default))
+            .foregroundStyle(prominent ? Color(nsColor: .alternateSelectedControlTextColor) : Color.primary)
+            .background(fill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(prominent ? Color.white.opacity(0.18) : PopoverTokens.outline, lineWidth: 0.75)
+            }
+            .shadow(color: Color.black.opacity(prominent ? 0.12 : 0.045), radius: pressed ? 1 : 2.5, y: pressed ? 0 : 1)
+            .scaleEffect(pressed && !reduceMotion ? 0.988 : 1)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: pressed)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isHovered)
+    }
+}
+
+@MainActor private final class PopoverInteractionState: ObservableObject {
+    @Published var actionHovered = false
+    @Published var menuHovered = false
+}
+
+@MainActor private final class SegmentInteractionState: ObservableObject {
+    @Published var hoveredValue: String?
 }
 @MainActor final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private let engine = Engine()
     private var statusItem: NSStatusItem?
     private var statusDot: StatusDotView?
     private var popover: NSPopover?
+    private var quickMenuPopover: NSPopover?
     private var outsideClickMonitor: Any?
     private var subscriptions = Set<AnyCancellable>()
 
@@ -302,7 +538,24 @@ struct ContentView: View {
         button.target = self
         button.action = #selector(statusItemClicked(_:))
 
-        let dot = StatusDotView(frame: NSRect(x: button.bounds.maxX - 5, y: 2, width: 4, height: 4))
+        let dotSize: CGFloat = 6
+        let iconSize: CGFloat = 20
+        let iconBounds = NSRect(
+            x: button.bounds.midX - iconSize / 2,
+            y: button.bounds.midY - iconSize / 2,
+            width: iconSize,
+            height: iconSize
+        )
+        let dotInset: CGFloat = 2
+        let dotY = button.isFlipped
+            ? iconBounds.maxY - dotSize + dotInset - 2
+            : iconBounds.minY - dotInset + 2
+        let dot = StatusDotView(frame: NSRect(
+            x: iconBounds.maxX - dotSize + dotInset,
+            y: dotY,
+            width: dotSize,
+            height: dotSize
+        ))
         dot.isHidden = !engine.running
         statusDot = dot
         button.addSubview(dot, positioned: .above, relativeTo: nil)
@@ -329,6 +582,9 @@ struct ContentView: View {
     func popoverDidClose(_ notification: Notification) {
         removeOutsideClickMonitor()
         engine.endPanelRefresh()
+        if let closedPopover = notification.object as? NSPopover, closedPopover === quickMenuPopover {
+            quickMenuPopover = nil
+        }
     }
 
     @objc private func statusItemClicked(_ sender: NSStatusBarButton) {
@@ -336,8 +592,11 @@ struct ContentView: View {
             popover?.performClose(nil)
             removeOutsideClickMonitor()
             engine.endPanelRefresh()
+            quickMenuPopover?.performClose(nil)
             showQuickMenu(from: sender)
-        } else if let popover {
+        } else {
+            quickMenuPopover?.performClose(nil)
+            guard let popover else { return }
             if popover.isShown {
                 popover.performClose(nil)
                 removeOutsideClickMonitor()
@@ -380,17 +639,27 @@ struct ContentView: View {
     }
 
     private func showQuickMenu(from button: NSStatusBarButton) {
-        let menu = NSMenu()
-        let action = NSMenuItem(title: engine.running ? "停止运行" : "开始运行", action: #selector(toggleRunning), keyEquivalent: "")
-        action.target = self
-        action.image = NSImage(systemSymbolName: engine.running ? "stop.fill" : "play.fill", accessibilityDescription: nil)
-        menu.addItem(action)
-        menu.addItem(.separator())
-        let quit = NSMenuItem(title: "退出 Always Online", action: #selector(quit), keyEquivalent: "")
-        quit.target = self
-        quit.image = NSImage(systemSymbolName: "power", accessibilityDescription: nil)
-        menu.addItem(quit)
-        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.maxY), in: button)
+        NSApp.activate(ignoringOtherApps: true)
+
+        let panel = NSPopover()
+        panel.behavior = .transient
+        panel.animates = true
+        panel.delegate = self
+        panel.contentSize = NSSize(width: 220, height: 86)
+        panel.contentViewController = NSHostingController(rootView: QuickMenuView(
+            isRunning: engine.running,
+            onToggle: { [weak self] in self?.performQuickMenuAction { self?.toggleRunning() } },
+            onQuit: { [weak self] in self?.performQuickMenuAction { self?.quit() } }
+        ))
+
+        quickMenuPopover = panel
+        panel.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        panel.contentViewController?.view.window?.makeKeyAndOrderFront(nil)
+    }
+
+    private func performQuickMenuAction(_ action: () -> Void) {
+        quickMenuPopover?.performClose(nil)
+        action()
     }
 
     @objc private func toggleRunning() {
@@ -403,11 +672,62 @@ struct ContentView: View {
     }
 }
 
+private struct QuickMenuView: View {
+    let isRunning: Bool
+    let onToggle: () -> Void
+    let onQuit: () -> Void
+
+    var body: some View {
+        VStack(spacing: 3) {
+            QuickMenuRow(
+                title: isRunning ? "停止运行" : "开始运行",
+                symbol: isRunning ? "stop.fill" : "play.fill",
+                action: onToggle
+            )
+
+            Divider()
+                .padding(.horizontal, 8)
+                .padding(.vertical, 1)
+
+            QuickMenuRow(title: "退出 Always Online", symbol: "power", action: onQuit)
+        }
+        .padding(6)
+        .frame(width: 220)
+    }
+}
+
+private struct QuickMenuRow: View {
+    let title: String
+    let symbol: String
+    let action: () -> Void
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: symbol)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 16)
+                    .accessibilityHidden(true)
+
+                Text(title)
+                    .font(.system(size: 13, weight: .medium, design: .default))
+                    .foregroundStyle(.primary)
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 9)
+            .frame(height: 31)
+            .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        }
+        .buttonStyle(.borderless)
+    }
+}
+
 @MainActor private final class StatusDotView: NSView {
     var running = false { didSet { isHidden = !running; needsDisplay = true } }
 
     override func draw(_ dirtyRect: NSRect) {
-        NSColor.secondaryLabelColor.setFill()
+        runningIndicatorColor.setFill()
         NSBezierPath(ovalIn: bounds).fill()
     }
 }
