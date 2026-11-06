@@ -17,14 +17,14 @@ Codex、Claude Code 正在写代码，你在看结果、查资料、思考下一
 ### 👀 看看它的样子
 
 <p align="center">
-  <img src="Resources/Screenshots/always-online-stopped.png" width="320" alt="已停止">
+  <img src="Resources/Screenshots/always-online-light.png" width="320" alt="浅色模式">
   &nbsp;
-  <img src="Resources/Screenshots/always-online-running.png" width="320" alt="运行中">
+  <img src="Resources/Screenshots/always-online-dark.png" width="320" alt="深色模式">
 </p>
 
 ### 🚀 下载体验
 
-**Download for macOS →**
+[Download for macOS →](https://github.com/DreamHeart09/AlwaysOnline/releases/download/0.1.0/Always-Online-0.1.0.dmg)
 
 ### 📦 本机生成 DMG
 
