@@ -16,11 +16,16 @@ Codex、Claude Code 正在写代码，你在看结果、查资料、思考下一
 
 ### 👀 看看它的样子
 
-<p align="center">
-  <img src="Resources/Screenshots/always-online-light.png" width="320" alt="浅色模式">
-  &nbsp;
-  <img src="Resources/Screenshots/always-online-dark.png" width="320" alt="深色模式">
-</p>
+<table align="center">
+  <tr>
+    <td align="center" valign="top" width="340">
+      <img src="Resources/Screenshots/always-online-light.png" height="405" alt="浅色模式">
+    </td>
+    <td align="center" valign="top" width="340">
+      <img src="Resources/Screenshots/always-online-dark.png" height="405" alt="深色模式">
+    </td>
+  </tr>
+</table>
 
 ### 🚀 下载体验
 
